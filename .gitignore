@@ -1,0 +1,34 @@
+# ============ Visual Studio ============
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ============ .NET 构建输出 ============
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+
+# 发布配置（本地文件夹发布目标）
+*.pubxml.user
+publish/
+
+# Inno Setup 安装包输出
+installer/
+
+# ============ IDE / 编辑器 ============
+*.resharper
+*.resharper.user
+*.rider
+.idea/
+
+# ============ 系统文件 ============
+Thumbs.db
+Desktop.ini
+.DS_Store

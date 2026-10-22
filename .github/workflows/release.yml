@@ -1,0 +1,111 @@
+# ============================================================
+# FuturesTicker — 自动打包并发布 GitHub Release
+# 触发方式：
+#   1. 推送 tag（v*，如 v1.1.0）→ 自动构建、打包、发布 Release
+#   2. 在 GitHub 仓库 Actions 页手动触发（workflow_dispatch）
+#      可填版本号，留空则使用当天日期（yyyy.MM.dd）作为版本
+# 产物：installer\FuturesTicker-{版本号}-setup.exe
+# ============================================================
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.1.0，留空则使用日期作为版本）'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 安装 .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 确定版本号
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            # tag 触发：从 v1.1.0 提取 1.1.0
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            # 手动触发：使用输入的版本号，留空则用日期
+            $version = '${{ github.event.inputs.version }}'
+            if ([string]::IsNullOrWhiteSpace($version)) {
+              $version = Get-Date -Format 'yyyy.MM.dd'
+            }
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+') {
+            throw "非法版本号: $version（应为 x.y.z 格式）"
+          }
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          Write-Host "版本号: $version"
+
+      - name: 发布应用（自包含 win-x64）
+        shell: pwsh
+        run: |
+          dotnet publish FuturesTicker.csproj -c Release -r win-x64 --self-contained true `
+            -o bin/Release/net10.0-windows/publish `
+            -p:Version=$env:VERSION
+
+      - name: 注入版本号到 installer.iss
+        shell: pwsh
+        run: |
+          $content = Get-Content installer.iss -Raw
+          $content = $content -replace '(#define MyAppVersion\s+")[^"]*(")', "`${1}$env:VERSION`${2}"
+          Set-Content installer.iss -Value $content -NoNewline
+          Write-Host "installer.iss 已更新为版本 $env:VERSION"
+
+      - name: 安装 Inno Setup 7
+        shell: pwsh
+        run: |
+          winget install --id JRSoftware.InnoSetup.7 -e --silent `
+            --accept-package-agreements --accept-source-agreements
+
+      - name: 编译安装包
+        shell: pwsh
+        run: |
+          # winget 静默安装 Inno Setup 7 的实测路径（当前用户目录）
+          $iscc = Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 7\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw "未找到 ISCC.exe: $iscc" }
+          Write-Host "使用编译器: $iscc"
+
+          # 兜底：CI 静默安装可能缺少翻译组件，中文语言文件缺失时回退英文
+          $langDir = Join-Path (Split-Path $iscc) "Languages"
+          if (!(Test-Path (Join-Path $langDir "ChineseSimplified.isl"))) {
+            Write-Warning "未找到 ChineseSimplified.isl，安装器语言回退为英文"
+            $content = Get-Content installer.iss -Raw
+            $content = $content -replace 'Name: "chinese"; MessagesFile: "compiler:Languages\\ChineseSimplified.isl"', 'Name: "english"; MessagesFile: "compiler:Default.isl"'
+            Set-Content installer.iss -Value $content -NoNewline
+          }
+
+          & $iscc installer.iss
+          Get-ChildItem installer
+
+      - name: 发布 GitHub Release（tag 触发）
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: installer/*.exe
+          generate_release_notes: true
+
+      - name: 发布 GitHub Release（手动触发）
+        if: github.ref_type != 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ env.VERSION }}
+          files: installer/*.exe
+          generate_release_notes: true

@@ -1,0 +1,35 @@
+<Window x:Class="FuturesTicker.AddContractDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="添加合约"
+        Icon="app.ico"
+        Width="380" Height="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStyle="ToolWindow">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="期货：RB0、AU0（主力连续用「品种代码+0」）&#10;期权：au2612C648（看涨）、au2612P648（看跌）"
+                   Foreground="#666666" FontSize="12" TextWrapping="Wrap"/>
+        <TextBox x:Name="CodeBox" Grid.Row="1" Margin="0,8,0,14" Padding="8,7" FontSize="14"/>
+
+        <StackPanel Grid.Row="2" Margin="0,4,0,0">
+            <TextBlock Text="常用品种（点击直接添加）：" Foreground="#666666" FontSize="12"/>
+            <ScrollViewer Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+                <WrapPanel x:Name="ButtonsPanel"/>
+            </ScrollViewer>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="取消" Width="76" Margin="0,0,8,0" Padding="0,6" Click="Cancel_Click"/>
+            <Button Content="添加" Width="76" Padding="0,6" IsDefault="True" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

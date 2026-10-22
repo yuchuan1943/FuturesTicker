@@ -1,0 +1,128 @@
+<Window x:Class="FuturesTicker.MainControlWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:FuturesTicker.Converters"
+        Title="期货行情助手"
+        Icon="app.ico"
+        Width="720" Height="560"
+        MinWidth="640" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        Closing="Window_Closing">
+    <Window.Resources>
+        <conv:ChangeBrushConverter x:Key="ChangeBrush"/>
+    </Window.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.25*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="0.75*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左栏：自选合约 -->
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="自选合约" FontSize="15" FontWeight="SemiBold" Foreground="#222222"/>
+
+                <ListBox x:Name="ContractList" Margin="0,10,0,0" MaxHeight="260"
+                         HorizontalContentAlignment="Stretch" SelectionMode="Single">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" MinWidth="56"/>
+                                    <ColumnDefinition Width="Auto" MinWidth="46"/>
+                                    <ColumnDefinition Width="Auto" MinWidth="54"/>
+                                    <ColumnDefinition Width="Auto" MinWidth="48"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding ShortName}" FontSize="12" Foreground="#333333" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Code}" FontSize="10" Foreground="#999999" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Last, StringFormat={}{0:0.###}}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           Foreground="{Binding Change, Converter={StaticResource ChangeBrush}}"/>
+                                <TextBlock Grid.Column="3" Text="{Binding ChangeText}" FontSize="10" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           Foreground="{Binding Change, Converter={StaticResource ChangeBrush}}"/>
+                                <Button Grid.Column="4" Content="✕" Click="RemoveRow_Click"
+                                        Margin="12,0,0,0" Padding="5,0" FontSize="11"
+                                        Foreground="#999999" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" ToolTip="移除该合约" VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="上移" Width="56" Margin="0,0,6,0" Click="MoveUp_Click"/>
+                    <Button Content="下移" Width="56" Margin="0,0,6,0" Click="MoveDown_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBox x:Name="CodeBox" Width="150" Padding="6,4" VerticalContentAlignment="Center" KeyDown="CodeBox_KeyDown"/>
+                    <Button Content="添加" Width="60" Margin="8,0,0,0" Click="Add_Click"/>
+                </StackPanel>
+
+                <TextBlock Text="常用品种（点击添加）" FontSize="11" Foreground="#999999" Margin="0,12,0,0"/>
+                <WrapPanel x:Name="CommonPanel" Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- 分隔线 -->
+            <Border Grid.Column="1" Width="1" Background="#16000000" Margin="18,0"/>
+
+            <!-- 右栏：显示设置 -->
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="显示设置" FontSize="15" FontWeight="SemiBold" Foreground="#222222"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock Text="刷新间隔" Width="80" VerticalAlignment="Center" Foreground="#444444"/>
+                    <ComboBox x:Name="IntervalCombo" Width="104" SelectionChanged="Interval_Changed">
+                        <ComboBoxItem Content="1 秒"/>
+                        <ComboBoxItem Content="2 秒"/>
+                        <ComboBoxItem Content="3 秒"/>
+                        <ComboBoxItem Content="5 秒"/>
+                        <ComboBoxItem Content="10 秒"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock Text="淡显透明度" Width="80" VerticalAlignment="Center" Foreground="#444444"/>
+                    <Slider x:Name="DimSlider" Width="150" Minimum="0.30" Maximum="0.75"
+                            SmallChange="0.05" LargeChange="0.15" ValueChanged="Dim_Changed"/>
+                    <TextBlock x:Name="DimLabel" Width="48" TextAlignment="Right" VerticalAlignment="Center" Foreground="#666666"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock Text="字体大小" Width="80" VerticalAlignment="Center" Foreground="#444444"/>
+                    <Slider x:Name="FontSlider" Width="150" Minimum="8" Maximum="20"
+                            SmallChange="0.5" LargeChange="1" ValueChanged="Font_Changed"/>
+                    <TextBlock x:Name="FontLabel" Width="48" TextAlignment="Right" VerticalAlignment="Center" Foreground="#666666"/>
+                </StackPanel>
+
+                <CheckBox x:Name="ShowWidgetCheck" Content="显示悬浮窗" Margin="0,14,0,0"
+                          Checked="ShowWidget_Changed" Unchecked="ShowWidget_Changed"/>
+
+                <CheckBox x:Name="MouseThroughCheck" Content="鼠标穿透（点击直达下层）" Margin="0,9,0,0"
+                          Checked="MouseThrough_Changed" Unchecked="MouseThrough_Changed"/>
+
+                <CheckBox x:Name="ShowColorCheck" Content="涨跌颜色（红涨绿跌）" Margin="0,9,0,0"
+                          Checked="ShowColor_Changed" Unchecked="ShowColor_Changed"/>
+
+                <CheckBox x:Name="PriceOnlyCheck" Content="只显示价格（极简）" Margin="0,9,0,0"
+                          Checked="PriceOnly_Changed" Unchecked="PriceOnly_Changed"/>
+
+                <CheckBox x:Name="TopmostCheck" Content="始终置顶" Margin="0,9,0,0"
+                          Checked="Topmost_Changed" Unchecked="Topmost_Changed"/>
+
+                <CheckBox x:Name="AutoStartCheck" Content="开机自启" Margin="0,9,0,0"
+                          Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"/>
+
+                <Border Height="1" Background="#14000000" Margin="0,16,0,16"/>
+
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="恢复悬浮窗位置" Width="124" Click="ResetPos_Click"/>
+                    <Button Content="退出程序" Width="86" Margin="10,0,0,0" Click="Exit_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Window>

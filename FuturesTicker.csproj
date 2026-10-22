@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>FuturesTicker</AssemblyName>
+    <RootNamespace>FuturesTicker</RootNamespace>
+    <!-- exe 图标：与托盘一致的灰色 ¥ 符号 -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 打包为 WPF 资源，供各窗口 Icon 通过 pack URI 引用 -->
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WinForms 会隐式注入 System.Windows.Forms / System.Drawing 的 global using，
+         与 WPF 的 System.Windows / System.Windows.Controls 等命名冲突，这里精准移除。 -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+</Project>
