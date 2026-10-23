@@ -53,6 +53,9 @@ public static class OptionProducts
         ["al"] = new("al_o", "shfe", "上期所", "沪铝"),
         ["px"] = new("px",   "czce", "郑商所", "对二甲苯"),
         ["sh"] = new("sh",   "czce", "郑商所", "烧碱"),
+        ["sa"] = new("sa",   "czce", "郑商所", "纯碱"),
+        ["fg"] = new("fg",   "czce", "郑商所", "玻璃"),
+        ["cs"] = new("cs_o", "dce",  "大商所", "玉米淀粉"),
     };
 
     // 期权合约代码：品种(1-2字母) + 月份(4位) + C/P + 行权价(数字)。
