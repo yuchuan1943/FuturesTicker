@@ -7,7 +7,7 @@
 ; ============================================================
 
 #define MyAppName       "FuturesTicker"
-#define MyAppVersion    "1.0.0"
+#define MyAppVersion    "1.0.1"
 #define MyAppPublisher  "FuturesTicker Contributors"
 #define MyAppURL        "https://github.com/yuchuan1943/FuturesTicker"
 #define MyAppExeName    "FuturesTicker.exe"

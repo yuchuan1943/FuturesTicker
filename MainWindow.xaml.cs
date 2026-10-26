@@ -131,8 +131,12 @@ public partial class MainWindow : Window
 
         e.Handled = true; // 阻止冒泡，避免触发拖拽
 
-        // 期权无分时数据（新浪 getMinLine 对期权返回 null），双击不弹分时图。
-        if (OptionProducts.IsOptionCode(q.Code)) return;
+        // 期权走期权详情窗口，期货走分时图。
+        if (OptionProducts.IsOptionCode(q.Code))
+        {
+            OptionDetailWindow.Show(q);
+            return;
+        }
 
         MinuteChartWindow.Show(q);
     }

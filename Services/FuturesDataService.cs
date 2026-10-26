@@ -84,6 +84,17 @@ public class FuturesDataService
     private sealed record OptionRow(double Bid, double Ask, double Last, double OpenInterest, double ChangePercent);
 
     /// <summary>
+    /// 单个期权合约的完整实时行情（来自新浪 P_OP 接口），用于期权详情窗口。
+    /// 字段已用多组合约实测验证，详见 GetOptionSpotAsync 注释。
+    /// </summary>
+    public sealed record OptionSpot(
+        double Last, double PrevSettle, double Open, double High, double Low,
+        double Bid, double Ask, double BidVolume, double AskVolume,
+        double Volume, double OpenInterest,
+        double Strike, double UpperLimit, double LowerLimit,
+        string Time);
+
+    /// <summary>
     /// 拉取指定品种+标的的完整期权链（含看涨 up / 看跌 down），返回 合约代码 -> 行情 映射。
     /// 字段：up = [买量, 买价, 最新价, 卖价, 卖量, 持仓量, 涨跌幅%, 行权价, 合约代码]；
     ///       down = [买量, 买价, 最新价, 卖价, 卖量, 持仓量, 涨跌幅%, 合约代码]。
@@ -149,6 +160,64 @@ public class FuturesDataService
             Low = row.Bid,    // 买一价
             OpenInterest = row.OpenInterest,
         };
+    }
+
+    /// <summary>
+    /// 获取单个期权合约的完整实时行情（新浪 P_OP 接口）。
+    /// 字段位（逗号分隔，实测确认）：
+    ///   0 买量, 1 买价, 2 最新价, 3 卖价, 4 卖量, 5 持仓量, 6 涨幅(空),
+    ///   7 行权价, 8 昨结算价, 9 开盘价, 10 涨停价, 11 跌停价,
+    ///   12-31 五档买卖盘, 32 行情时间, 39 最高价, 40 最低价, 41 成交量。
+    /// </summary>
+    public async Task<OptionSpot?> GetOptionSpotAsync(string code)
+    {
+        code = code.Trim();
+        if (string.IsNullOrEmpty(code)) return null;
+
+        // 新浪 P_OP 接口大小写敏感：必须是「品种小写 + 月份 + C/P 大写 + 行权价」
+        // （如 sa2612C1000）；全大写或全小写都返回空。这里用解析器重组出标准格式。
+        var parsed = OptionProducts.TryParse(code);
+        var sym = parsed != null
+            ? parsed.Sym.ToLowerInvariant() + parsed.Month + parsed.Cp + parsed.Strike
+            : code;
+
+        try
+        {
+            var url = "https://hq.sinajs.cn/list=P_OP_" + sym;
+            var bytes = await Http.GetByteArrayAsync(url);
+            var text = Encoding.GetEncoding("GBK").GetString(bytes);
+
+            int q1 = text.IndexOf('"');
+            int q2 = text.LastIndexOf('"');
+            if (q1 < 0 || q2 <= q1) return null;
+
+            var body = text.Substring(q1 + 1, q2 - q1 - 1);
+            if (string.IsNullOrEmpty(body)) return null;
+
+            var f = body.Split(',');
+            if (f.Length < 42) return null;
+
+            return new OptionSpot(
+                Last: Num(f[2]),
+                PrevSettle: Num(f[8]),
+                Open: Num(f[9]),
+                High: Num(f[39]),
+                Low: Num(f[40]),
+                Bid: Num(f[1]),
+                Ask: Num(f[3]),
+                BidVolume: Num(f[0]),
+                AskVolume: Num(f[4]),
+                Volume: Num(f[41]),
+                OpenInterest: Num(f[5]),
+                Strike: Num(f[7]),
+                UpperLimit: Num(f[10]),
+                LowerLimit: Num(f[11]),
+                Time: f[32]);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
