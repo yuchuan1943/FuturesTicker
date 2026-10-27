@@ -56,32 +56,86 @@ public class FuturesDataService
             }
         }
 
-        // 期权：新浪 getOptionData 期权链接口，按 (product, exchange, pinzhong) 分组拉整链后提取目标合约。
+        // 期权：P_OP 实时行情接口（批量一次请求）。
+        // 注意不能用 getOptionData：它返回的是延迟/缓存的价格，与 P_OP 实时价不一致（列表价格会"错误"）。
         if (options.Count > 0)
         {
-            var groups = options
-                .Select(code => (Code: code, Parsed: OptionProducts.TryParse(code)))
-                .Where(x => x.Parsed != null)
-                .GroupBy(x => (x.Parsed!.Info.Product, x.Parsed!.Info.Exchange, x.Parsed!.PinZhong));
-
-            foreach (var g in groups)
-            {
-                var chain = await GetOptionChainAsync(g.Key.Product, g.Key.Exchange, g.Key.PinZhong);
-                foreach (var (code, parsed) in g)
-                {
-                    if (chain.TryGetValue(code, out var row))
-                    {
-                        result.Add(ToQuote(code, parsed!, row));
-                    }
-                }
-            }
+            result.AddRange(await GetOptionQuotesAsync(options));
         }
 
         return result;
     }
 
-    /// <summary>期权链中的一行行情（已按字段位映射）。</summary>
-    private sealed record OptionRow(double Bid, double Ask, double Last, double OpenInterest, double ChangePercent);
+    /// <summary>
+    /// 批量获取期权实时行情（新浪 P_OP 接口，逗号分隔一次请求多个合约）。
+    /// P_OP 字段：0买量,1买价,2最新价,3卖价,4卖量,5持仓量,6涨幅(空),7行权价,
+    /// 8昨结算价,9开盘价,10涨停价,11跌停价,12-31五档,32时间,39最高价,40最低价,41成交量。
+    /// </summary>
+    private async Task<List<FuturesQuote>> GetOptionQuotesAsync(List<string> codes)
+    {
+        var result = new List<FuturesQuote>();
+
+        // 代码(大写) -> 标准小写 sym（P_OP 接口要求「品种小写+月份+C/P大写+行权价」）。
+        var pairs = new List<(string Code, string Sym, OptionProducts.Parsed Parsed)>();
+        foreach (var code in codes)
+        {
+            var p = OptionProducts.TryParse(code);
+            if (p == null) continue;
+            pairs.Add((code, p.Sym.ToLowerInvariant() + p.Month + p.Cp + p.Strike, p));
+        }
+        if (pairs.Count == 0) return result;
+
+        try
+        {
+            var url = "https://hq.sinajs.cn/list=" + string.Join(",", pairs.Select(x => "P_OP_" + x.Sym));
+            var bytes = await Http.GetByteArrayAsync(url);
+            var text = Encoding.GetEncoding("GBK").GetString(bytes);
+
+            var bySym = new Dictionary<string, FuturesQuote>(StringComparer.OrdinalIgnoreCase);
+            foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = line.IndexOf('=');
+                if (eq < 0) continue;
+                // "var hq_str_P_OP_sa2612C1000=..." -> "sa2612C1000"
+                var sym = line[..eq].Split('_').Last();
+
+                int q1 = line.IndexOf('"', eq);
+                int q2 = line.LastIndexOf('"');
+                if (q1 < 0 || q2 <= q1) continue;
+                var body = line.Substring(q1 + 1, q2 - q1 - 1);
+                if (string.IsNullOrEmpty(body)) continue;
+
+                var f = body.Split(',');
+                if (f.Length < 42) continue;
+
+                bySym[sym] = new FuturesQuote
+                {
+                    Last = Num(f[2]),
+                    PrevSettle = Num(f[8]),
+                    Open = Num(f[9]),
+                    High = Num(f[39]),
+                    Low = Num(f[40]),
+                    Volume = Num(f[41]),
+                    OpenInterest = Num(f[5]),
+                };
+            }
+
+            foreach (var (code, sym, parsed) in pairs)
+            {
+                if (!bySym.TryGetValue(sym, out var q)) continue;
+                q.Code = code;
+                q.Name = $"{parsed.Info.Name}{(parsed.IsCall ? "购" : "沽")}{parsed.Strike}";
+                q.Exchange = parsed.Info.ExchangeName;
+                result.Add(q);
+            }
+        }
+        catch
+        {
+            // 网络异常返回空，由上层静默处理。
+        }
+
+        return result;
+    }
 
     /// <summary>
     /// 单个期权合约的完整实时行情（来自新浪 P_OP 接口），用于期权详情窗口。
@@ -93,74 +147,6 @@ public class FuturesDataService
         double Volume, double OpenInterest,
         double Strike, double UpperLimit, double LowerLimit,
         string Time);
-
-    /// <summary>
-    /// 拉取指定品种+标的的完整期权链（含看涨 up / 看跌 down），返回 合约代码 -> 行情 映射。
-    /// 字段：up = [买量, 买价, 最新价, 卖价, 卖量, 持仓量, 涨跌幅%, 行权价, 合约代码]；
-    ///       down = [买量, 买价, 最新价, 卖价, 卖量, 持仓量, 涨跌幅%, 合约代码]。
-    /// </summary>
-    private async Task<Dictionary<string, OptionRow>> GetOptionChainAsync(string product, string exchange, string pinZhong)
-    {
-        var map = new Dictionary<string, OptionRow>(StringComparer.OrdinalIgnoreCase);
-
-        var url = "https://stock.finance.sina.com.cn/futures/api/openapi.php/OptionService.getOptionData" +
-                  $"?type=futures&product={product}&exchange={exchange}&pinzhong={pinZhong}";
-        var json = await Http.GetStringAsync(url);
-
-        using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("result", out var resultEl)) return map;
-        if (!resultEl.TryGetProperty("data", out var dataEl)) return map;
-
-        foreach (var side in new[] { "up", "down" })
-        {
-            if (!dataEl.TryGetProperty(side, out var arr)) continue;
-            foreach (var el in arr.EnumerateArray())
-            {
-                if (el.ValueKind != JsonValueKind.Array) continue;
-                int len = el.GetArrayLength();
-                if (len < 7) continue;
-
-                var contract = Str(el[len - 1]);
-                if (string.IsNullOrWhiteSpace(contract)) continue;
-
-                map[contract] = new OptionRow(
-                    Bid: Num(Str(el[1])),
-                    Ask: Num(Str(el[3])),
-                    Last: Num(Str(el[2])),
-                    OpenInterest: Num(Str(el[5])),
-                    ChangePercent: Num(Str(el[6])));
-            }
-        }
-        return map;
-    }
-
-    private static string Str(JsonElement el) =>
-        el.ValueKind == JsonValueKind.String ? el.GetString() ?? "" :
-        el.ValueKind == JsonValueKind.Number ? el.GetRawText() : "";
-
-    /// <summary>把期权链中的一行转成 FuturesQuote；昨结算价由涨跌幅反推。</summary>
-    private static FuturesQuote ToQuote(string code, OptionProducts.Parsed parsed, OptionRow row)
-    {
-        // 涨跌幅% -> 昨结算价反推：prev = last / (1 + pct/100)。
-        // pct <= -99.9 视为价格归零，昨结算价置 0（ChangePercent 有除零保护，返回 0）。
-        double prevSettle = 0;
-        if (row.Last > 0 && row.ChangePercent > -99.9)
-        {
-            prevSettle = row.Last / (1 + row.ChangePercent / 100.0);
-        }
-
-        return new FuturesQuote
-        {
-            Code = code,
-            Name = $"{parsed.Info.Name}{(parsed.IsCall ? "购" : "沽")}{parsed.Strike}",
-            Exchange = parsed.Info.ExchangeName,
-            Last = row.Last,
-            PrevSettle = prevSettle,
-            High = row.Ask,   // 卖一价
-            Low = row.Bid,    // 买一价
-            OpenInterest = row.OpenInterest,
-        };
-    }
 
     /// <summary>
     /// 获取单个期权合约的完整实时行情（新浪 P_OP 接口）。
