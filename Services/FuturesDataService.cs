@@ -37,12 +37,15 @@ public class FuturesDataService
 
         if (list.Count == 0) return new List<FuturesQuote>();
 
-        var futures = list.Where(c => !OptionProducts.IsOptionCode(c)).ToList();
+        var futures = list
+            .Where(c => !OptionProducts.IsOptionCode(c) && !GlobalProducts.IsGlobalCode(c))
+            .ToList();
         var options = list.Where(OptionProducts.IsOptionCode).ToList();
+        var globals = list.Where(GlobalProducts.IsGlobalCode).ToList();
 
         var result = new List<FuturesQuote>();
 
-        // 期货：新浪 nf_ 接口（GBK 编码，一次批量）。
+        // 国内期货：新浪 nf_ 接口（GBK 编码，一次批量）。
         if (futures.Count > 0)
         {
             var url = "https://hq.sinajs.cn/list=" + string.Join(",", futures.Select(c => "nf_" + c));
@@ -52,6 +55,20 @@ public class FuturesDataService
             foreach (var raw in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var quote = ParseLine(raw);
+                if (quote != null) result.Add(quote);
+            }
+        }
+
+        // 外盘期货：新浪 hf_ 接口（GBK 编码，一次批量）。
+        if (globals.Count > 0)
+        {
+            var url = "https://hq.sinajs.cn/list=" + string.Join(",", globals.Select(c => "hf_" + c));
+            var bytes = await Http.GetByteArrayAsync(url);
+            var text = Encoding.GetEncoding("GBK").GetString(bytes);
+
+            foreach (var raw in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var quote = ParseGlobalLine(raw);
                 if (quote != null) result.Add(quote);
             }
         }
@@ -207,6 +224,58 @@ public class FuturesDataService
     }
 
     /// <summary>
+    /// 单个外盘期货的完整实时行情（新浪 hf_ 接口），用于外盘详情窗口。
+    /// 字段布局与 ParseGlobalLine 一致。
+    /// </summary>
+    public sealed record GlobalSpot(
+        double Last, double PrevSettle, double Open, double High, double Low,
+        double Bid, double Ask, double OpenInterest,
+        string Time, string Date, string Name, string Exchange);
+
+    public async Task<GlobalSpot?> GetGlobalSpotAsync(string code)
+    {
+        code = code.Trim();
+        if (string.IsNullOrEmpty(code)) return null;
+
+        try
+        {
+            var url = "https://hq.sinajs.cn/list=hf_" + code;
+            var bytes = await Http.GetByteArrayAsync(url);
+            var text = Encoding.GetEncoding("GBK").GetString(bytes);
+
+            int q1 = text.IndexOf('"');
+            int q2 = text.LastIndexOf('"');
+            if (q1 < 0 || q2 <= q1) return null;
+
+            var body = text.Substring(q1 + 1, q2 - q1 - 1);
+            if (string.IsNullOrEmpty(body)) return null;
+
+            var f = body.Split(',');
+            if (f.Length < 10) return null;
+
+            var info = GlobalProducts.Get(code);
+
+            return new GlobalSpot(
+                Last: Num(f[0]),
+                PrevSettle: Num(f[7]),
+                Open: Num(f[8]),
+                High: Num(f[4]),
+                Low: Num(f[5]),
+                Bid: Num(f[2]),
+                Ask: Num(f[3]),
+                OpenInterest: Num(f[9]),
+                Time: f[6],
+                Date: f.Length > 12 ? f[12] : "",
+                Name: info?.Name ?? (f.Length > 13 ? f[13] : code),
+                Exchange: info?.Exchange ?? "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 获取指定合约的分时数据（含均价线），用于分时图。
     /// 新浪接口 InnerFuturesNewService.getMinLine 返回 [时间, 最新价, 均价, 成交量, 持仓]，
     /// 首行额外带 [昨结算价, 日期]。
@@ -282,6 +351,46 @@ public class FuturesDataService
             OpenInterest = Num(f[13]),
             Volume = Num(f[14]),
             Exchange = f[15],
+        };
+    }
+
+    /// <summary>
+    /// 解析新浪外盘 hf_ 接口的行情行。字段（逗号分隔，据 AKShare futures_hq_sina.py 确认）：
+    ///   0 最新价, 1 空, 2 买价, 3 卖价, 4 最高价, 5 最低价, 6 行情时间,
+    ///   7 昨日结算价, 8 开盘价, 9 持仓量, 10 空, 11 空, 12 日期, 13 名称, 14 空。
+    /// </summary>
+    private static FuturesQuote? ParseGlobalLine(string line)
+    {
+        int eq = line.IndexOf('=');
+        if (eq < 0) return null;
+
+        // "var hq_str_hf_OIL=..." -> "OIL"
+        var code = line[..eq].Split('_').Last().Trim();
+
+        int q1 = line.IndexOf('"', eq);
+        int q2 = line.LastIndexOf('"');
+        if (q1 < 0 || q2 <= q1) return null;
+
+        var body = line.Substring(q1 + 1, q2 - q1 - 1);
+        if (string.IsNullOrEmpty(body)) return null;
+
+        var f = body.Split(',');
+        if (f.Length < 10) return null;
+
+        var info = GlobalProducts.Get(code);
+
+        return new FuturesQuote
+        {
+            Code = code,
+            Name = info?.Name ?? (f.Length > 13 ? f[13] : code),
+            Exchange = info?.Exchange ?? "",
+            Last = Num(f[0]),
+            PrevSettle = Num(f[7]),
+            Open = Num(f[8]),
+            High = Num(f[4]),
+            Low = Num(f[5]),
+            OpenInterest = Num(f[9]),
+            Volume = 0,
         };
     }
 

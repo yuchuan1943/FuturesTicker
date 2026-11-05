@@ -17,7 +17,17 @@ public class AppConfig
     public bool MouseThrough { get; set; } = true;
     public bool ShowColor { get; set; } = true;
     public bool PriceOnly { get; set; } = false;
-    public bool ShowWidget { get; set; } = true;
+
+    /// <summary>只在交易时段（前后各 10 分钟缓冲）刷新，休市期暂停轮询，避免无效请求。</summary>
+    public bool OnlyTradeTime { get; set; } = true;
+
+    // 老板键：全局热键，按下隐藏所有窗口，再按恢复。
+    public bool BossKeyEnabled { get; set; } = false;
+    // 修饰键位标志（与 Win32 MOD_* 一致：1=Alt, 2=Ctrl, 4=Shift, 8=Win）。
+    public int BossKeyModifiers { get; set; } = 6; // Ctrl + Shift
+    // 主键虚拟键码（KeyInterop.VirtualKeyFromKey），默认 H。
+    public int BossKeyKey { get; set; } = 0x48;
+
     public List<string> Contracts { get; set; } = new() { "RB0", "AU0", "SC0", "M0" };
 }
 

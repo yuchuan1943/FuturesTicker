@@ -84,6 +84,9 @@
                     </ComboBox>
                 </StackPanel>
 
+                <CheckBox x:Name="OnlyTradeTimeCheck" Content="只在交易时段刷新（前后 10 分钟）" Margin="0,12,0,0"
+                          Checked="OnlyTradeTime_Changed" Unchecked="OnlyTradeTime_Changed"/>
+
                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                     <TextBlock Text="淡显透明度" Width="80" VerticalAlignment="Center" Foreground="#444444"/>
                     <Slider x:Name="DimSlider" Width="150" Minimum="0.30" Maximum="0.75"
@@ -98,10 +101,7 @@
                     <TextBlock x:Name="FontLabel" Width="48" TextAlignment="Right" VerticalAlignment="Center" Foreground="#666666"/>
                 </StackPanel>
 
-                <CheckBox x:Name="ShowWidgetCheck" Content="显示悬浮窗" Margin="0,14,0,0"
-                          Checked="ShowWidget_Changed" Unchecked="ShowWidget_Changed"/>
-
-                <CheckBox x:Name="MouseThroughCheck" Content="鼠标穿透（点击直达下层）" Margin="0,9,0,0"
+                <CheckBox x:Name="MouseThroughCheck" Content="鼠标穿透（点击直达下层）" Margin="0,14,0,0"
                           Checked="MouseThrough_Changed" Unchecked="MouseThrough_Changed"/>
 
                 <CheckBox x:Name="ShowColorCheck" Content="涨跌颜色（红涨绿跌）" Margin="0,9,0,0"
@@ -115,6 +115,20 @@
 
                 <CheckBox x:Name="AutoStartCheck" Content="开机自启" Margin="0,9,0,0"
                           Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"/>
+
+                <Border Height="1" Background="#14000000" Margin="0,16,0,16"/>
+
+                <TextBlock Text="老板键" FontSize="13" FontWeight="SemiBold" Foreground="#333333"/>
+
+                <CheckBox x:Name="BossKeyCheck" Content="启用老板键（隐藏所有窗口）" Margin="0,10,0,0"
+                          Checked="BossKey_Changed" Unchecked="BossKey_Changed"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="快捷键" Width="80" VerticalAlignment="Center" Foreground="#444444"/>
+                    <Button x:Name="HotkeyBtn" Padding="12,4" Click="Hotkey_Record_Click"/>
+                    <TextBlock Text="点击后按新组合键" FontSize="11" Foreground="#999999"
+                               Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
 
                 <Border Height="1" Background="#14000000" Margin="0,16,0,16"/>
 

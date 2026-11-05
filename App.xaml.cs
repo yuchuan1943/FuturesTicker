@@ -13,6 +13,7 @@ public partial class App : Application
 {
     private Mutex? _mutex;
     private TrayIconService? _tray;
+    private BossKeyService? _bossKey;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -34,10 +35,12 @@ public partial class App : Application
         window.Show();
 
         _tray = new TrayIconService();
+        _bossKey = new BossKeyService();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _bossKey?.Dispose();
         _tray?.Dispose();
         base.OnExit(e);
     }

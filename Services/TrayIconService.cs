@@ -16,7 +16,6 @@ public sealed class TrayIconService : IDisposable
 
     private readonly NotifyIcon _notify;
     private readonly AppConfig _config = AppConfig.Current;
-    private readonly ToolStripMenuItem _showWidgetItem;
     private readonly ToolStripMenuItem _mouseThroughItem;
     private readonly ToolStripMenuItem _showColorItem;
     private readonly ToolStripMenuItem _priceOnlyItem;
@@ -24,13 +23,6 @@ public sealed class TrayIconService : IDisposable
     public TrayIconService()
     {
         Instance = this;
-
-        _showWidgetItem = new ToolStripMenuItem("显示悬浮窗")
-        {
-            Checked = _config.ShowWidget,
-            CheckOnClick = true,
-        };
-        _showWidgetItem.CheckedChanged += (_, _) => SetShowWidget(_showWidgetItem.Checked);
 
         _mouseThroughItem = new ToolStripMenuItem("鼠标穿透（点击直达下层）")
         {
@@ -57,7 +49,6 @@ public sealed class TrayIconService : IDisposable
         var open = new ToolStripMenuItem("打开主界面");
         open.Click += (_, _) => MainControlWindow.ShowWindow();
         menu.Items.Add(open);
-        menu.Items.Add(_showWidgetItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_mouseThroughItem);
         menu.Items.Add(_showColorItem);
@@ -80,17 +71,9 @@ public sealed class TrayIconService : IDisposable
     /// <summary>刷新托盘菜单勾选状态（供主界面/悬浮窗改动开关后同步）。</summary>
     public void SyncFromConfig()
     {
-        _showWidgetItem.Checked = _config.ShowWidget;
         _mouseThroughItem.Checked = _config.MouseThrough;
         _showColorItem.Checked = _config.ShowColor;
         _priceOnlyItem.Checked = _config.PriceOnly;
-    }
-
-    private void SetShowWidget(bool enabled)
-    {
-        _config.ShowWidget = enabled;
-        ConfigStore.Save(_config);
-        MainWindow.Instance?.ApplyWidgetVisibility();
     }
 
     private void SetMouseThrough(bool enabled)

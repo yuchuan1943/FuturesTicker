@@ -40,7 +40,21 @@ public partial class MainWindow : Window
         {
             Interval = TimeSpan.FromSeconds(Math.Max(1, _config.RefreshIntervalSeconds)),
         };
-        _timer.Tick += async (_, _) => await RefreshAsync();
+        _timer.Tick += async (_, _) =>
+        {
+            EnsureTopmost(); // 每次刷新兜底置顶，防止被新窗口挤到后面
+            if (!_config.OnlyTradeTime || TradingHoursHelper.IsTradingTime(DateTime.Now, HasGlobalContract()))
+            {
+                await RefreshAsync();
+            }
+            else
+            {
+                StatusText.Text = "休市";
+            }
+        };
+
+        // 浮窗被其他窗口抢走焦点而"挤到后面"时，立即重新置顶。
+        Deactivated += (_, _) => Dispatcher.BeginInvoke(EnsureTopmost, DispatcherPriority.ApplicationIdle);
 
         ApplyHoverSettings();
         ApplyDisplaySettings();
@@ -59,9 +73,6 @@ public partial class MainWindow : Window
         Topmost = _config.Topmost;
         _timer.Start();
         _ = RefreshAsync();
-
-        // 若配置为隐藏悬浮窗，初始化完成后隐藏（托盘仍持续刷新价格）。
-        if (!_config.ShowWidget) Hide();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -131,14 +142,22 @@ public partial class MainWindow : Window
 
         e.Handled = true; // 阻止冒泡，避免触发拖拽
 
-        // 期权走期权详情窗口，期货走分时图。
+        // 期权走期权详情窗口，外盘走外盘详情窗口，国内期货走分时图。
         if (OptionProducts.IsOptionCode(q.Code))
         {
             OptionDetailWindow.Show(q);
-            return;
+        }
+        else if (GlobalProducts.IsGlobalCode(q.Code))
+        {
+            GlobalDetailWindow.Show(q);
+        }
+        else
+        {
+            MinuteChartWindow.Show(q);
         }
 
-        MinuteChartWindow.Show(q);
+        // 新窗口激活会把浮窗挤下去，稍后（消息循环空闲时）强制重新置顶。
+        Dispatcher.BeginInvoke(EnsureTopmost, DispatcherPriority.ApplicationIdle);
     }
 
     // ---- Opacity ----
@@ -148,19 +167,6 @@ public partial class MainWindow : Window
     {
         BeginAnimation(OpacityProperty, null);
         Opacity = _config.DimOpacity;
-    }
-
-    /// <summary>按配置显示/隐藏悬浮窗。</summary>
-    public void ApplyWidgetVisibility()
-    {
-        if (_config.ShowWidget)
-        {
-            if (!IsVisible) Show();
-        }
-        else
-        {
-            if (IsVisible) Hide();
-        }
     }
 
     /// <summary>应用显示设置：只显示价格（切换模板+隐藏状态行）与颜色开关（重建列表重新求值）。</summary>
@@ -196,7 +202,6 @@ public partial class MainWindow : Window
         ApplyMouseThrough();
         ApplyDisplaySettings();
         ApplyFontSize();
-        ApplyWidgetVisibility();
         _ = RefreshAsync();
     }
 
@@ -211,6 +216,25 @@ public partial class MainWindow : Window
         Top = pos.Y;
         _pinnedToCorner = true;
     }
+
+    /// <summary>
+    /// 强制浮窗置顶。WPF 的 Topmost 是"软置顶"，当本应用打开新窗口并激活时
+    /// （主界面 Activate()、双击弹分时图/期权详情），WPF 的 z-order 管理会把浮窗挤下去，
+    /// 表现为"开新窗口后浮窗跑到后面"。这里用 Win32 SetWindowPos(HWND_TOPMOST) 强制拉回最顶，
+    /// 且 SWP_NOACTIVATE 不抢焦点、不闪烁。
+    /// </summary>
+    public void EnsureTopmost()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        if (!_config.Topmost) return;
+        if (!IsVisible) return;
+        Win32.SetWindowPos(_hwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0,
+            Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
+    }
+
+    /// <summary>自选里是否包含外盘期货品种（用于交易时段判断）。</summary>
+    private bool HasGlobalContract() =>
+        TradingHoursHelper.HasGlobalContract(_config.Contracts);
 
     // ---- Refresh ----
 

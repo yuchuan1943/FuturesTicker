@@ -1,8 +1,8 @@
 namespace FuturesTicker.Services;
 
 /// <summary>
-/// A handy reference list of common domestic commodity futures
-/// continuous contracts (主力连续, suffixed with 0).
+/// A handy reference list of common commodity futures continuous contracts.
+/// 国内主力连续（后缀 0）+ 常见外盘品种（纯代码）。
 /// </summary>
 public static class CommonContracts
 {
@@ -15,5 +15,9 @@ public static class CommonContracts
         ("SA0", "纯碱"), ("FG0", "玻璃"), ("C0", "玉米"), ("CS0", "玉米淀粉"),
         ("M0", "豆粕"), ("Y0", "豆油"), ("P0", "棕榈油"), ("SR0", "白糖"), ("CF0", "棉花"),
         ("RU0", "橡胶"), ("BU0", "沥青"), ("SP0", "纸浆"), ("PG0", "LPG"), ("OI0", "菜油"),
+        // 外盘（国际）期货
+        ("OIL", "布伦特原油"), ("CL", "WTI原油"), ("GC", "COMEX黄金"), ("SI", "COMEX白银"),
+        ("HG", "COMEX铜"), ("CAD", "LME铜3个月"), ("S", "CBOT大豆"), ("C", "CBOT玉米"),
+        ("W", "CBOT小麦"), ("NG", "NYMEX天然气"), ("XAU", "伦敦金"),
     };
 }

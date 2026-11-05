@@ -52,7 +52,12 @@ public partial class OptionDetailWindow : Window
         {
             Interval = TimeSpan.FromSeconds(Math.Max(2, AppConfig.Current.RefreshIntervalSeconds)),
         };
-        _timer.Tick += async (_, _) => await RefreshAsync();
+        _timer.Tick += async (_, _) =>
+        {
+            if (AppConfig.Current.OnlyTradeTime && !TradingHoursHelper.IsTradingTime(DateTime.Now))
+                return;
+            await RefreshAsync();
+        };
         _timer.Start();
 
         Loaded += async (_, _) => await RefreshAsync();
